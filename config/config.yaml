@@ -1,0 +1,37 @@
+project:
+  name: FinLaya
+  timezone: Asia/Kolkata
+
+trading:
+  start_time: "09:27:00"
+  force_exit_time: "15:13:00"
+  lots: 1
+  expected_lot_size: 65
+  enforce_expected_lot_size: true
+  strike_step: 50
+  lot_size_source: "broker"
+
+strategy:
+  decision_interval_seconds: 0.5
+  confidence_threshold: 0.60
+
+market_data:
+  candle_interval: "1minute"
+  historical_candles: 6
+  max_staleness_seconds: 2.0
+
+laya:
+  model: "convaiinnovations/laya"
+  device: "auto"
+  confidence_threshold: 0.60
+
+paper_trading:
+  enabled: true
+  price_fallback: "ltp"
+
+database:
+  path: "data/finlaya.db"
+
+logging:
+  level: "INFO"
+  directory: "data/logs"

@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Environment files
+.env
+.env.local
+
+# Databases and runtime data
+data/finlaya.db
+data/finlaya.db-journal
+data/finlaya.db-wal
+data/finlaya.db-shm
+data/logs/*.log
+data/logs/*.jsonl
+data/runtime/*
+!data/runtime/.gitkeep
+!data/logs/.gitkeep
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Hugging Face and PyTorch caches
+.cache/
+hf_cache/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
