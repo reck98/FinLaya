@@ -27,9 +27,13 @@ export const TopStatusBar: React.FC<Props> = ({ health, market, istTime, wsConne
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         {/* Left: Brand & Statuses */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold tracking-wider text-zinc-100 text-sm">FINLAYA</span>
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+          <div className="flex items-center gap-2">
+            <img
+              src="/logo.png"
+              alt="FinLaya"
+              className="h-6 w-auto max-w-[140px] object-contain shrink-0"
+            />
+            <span className="rounded bg-zinc-800/90 border border-zinc-700/60 px-1.5 py-0.5 text-[10px] font-mono font-medium text-zinc-300">
               PAPER
             </span>
           </div>
