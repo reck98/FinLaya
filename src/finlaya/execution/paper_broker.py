@@ -32,12 +32,14 @@ class PaperBroker:
         pe_key: str,
         price_fallback: str = "ltp",
         repository: DatabaseRepository | None = None,
+        telemetry: Any | None = None,
     ):
         self.cache = cache
         self.ce_key = ce_key
         self.pe_key = pe_key
         self.price_fallback = price_fallback
         self.repository = repository
+        self.telemetry = telemetry
 
         self._order_counter: int = 0
         self._orders: dict[int, PaperOrder] = {}
@@ -155,6 +157,35 @@ class PaperBroker:
                     )
                 )
 
+            if self.telemetry:
+                self.telemetry.emit(
+                    "order_update",
+                    {
+                        "order_id": order_id,
+                        "session_id": session_id,
+                        "instrument": symbol,
+                        "side": side.value,
+                        "quantity": quantity,
+                        "fill_price": fill_price,
+                        "status": "FILLED",
+                        "source": source,
+                    },
+                )
+                self.telemetry.emit(
+                    "position_update",
+                    {
+                        "session_id": session_id,
+                        "instrument": self._position.symbol or "FLAT",
+                        "side": self._position.side.value,
+                        "quantity": self._position.quantity,
+                        "entry_price": self._position.entry_price,
+                        "current_price": self._position.current_price,
+                        "realized_pnl": self._position.realized_pnl,
+                        "unrealized_pnl": self._position.unrealized_pnl,
+                        "total_pnl": round(self._position.realized_pnl + self._position.unrealized_pnl, 2),
+                    },
+                )
+
         except Exception as e:
             order.status = OrderStatus.REJECTED
             order.reason = str(e)
@@ -218,4 +249,14 @@ class PaperBroker:
             self._position.unrealized_pnl = round(
                 (quote.ltp - self._position.entry_price) * self._position.quantity, 2
             )
+            if self.telemetry:
+                self.telemetry.emit(
+                    "pnl_update",
+                    {
+                        "realized_pnl": self._position.realized_pnl,
+                        "unrealized_pnl": self._position.unrealized_pnl,
+                        "total_pnl": round(self._position.realized_pnl + self._position.unrealized_pnl, 2),
+                        "current_price": self._position.current_price,
+                    },
+                )
         return self._position.unrealized_pnl

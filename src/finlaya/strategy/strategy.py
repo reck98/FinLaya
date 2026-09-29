@@ -45,6 +45,7 @@ class FinLayaStrategy:
         trading_clock: TradingClock,
         nifty_key: str,
         repository: DatabaseRepository | None = None,
+        telemetry: Any | None = None,
     ):
         self.session_id = session_id
         self.config = config
@@ -58,6 +59,7 @@ class FinLayaStrategy:
         self.trading_clock = trading_clock
         self.nifty_key = nifty_key
         self.repository = repository
+        self.telemetry = telemetry
 
         self.fsm = StrategyStateMachine(confidence_threshold=config.strategy.confidence_threshold)
         self._running = False
@@ -113,6 +115,25 @@ class FinLayaStrategy:
                 )
             )
 
+        if self.telemetry:
+            self.telemetry.emit(
+                "market_update",
+                {
+                    "nifty_spot": snapshot.underlying.spot,
+                    "ce_ltp": snapshot.selected_contracts.ce.ltp,
+                    "pe_ltp": snapshot.selected_contracts.pe.ltp,
+                    "ce_bid": snapshot.selected_contracts.ce.bid,
+                    "ce_ask": snapshot.selected_contracts.ce.ask,
+                    "pe_bid": snapshot.selected_contracts.pe.bid,
+                    "pe_ask": snapshot.selected_contracts.pe.ask,
+                    "ce_volume": snapshot.selected_contracts.ce.volume,
+                    "pe_volume": snapshot.selected_contracts.pe.volume,
+                    "ce_oi": snapshot.selected_contracts.ce.oi,
+                    "pe_oi": snapshot.selected_contracts.pe.oi,
+                    "timestamp": snapshot.session.timestamp,
+                },
+            )
+
         # 6. Build deterministic typed question
         questions = build_laya_question(pos.side.value)
 
@@ -143,6 +164,23 @@ class FinLayaStrategy:
                     state_json=snapshot.to_laya_json(),
                     inference_latency_ms=latency_ms,
                 )
+            )
+
+        if self.telemetry:
+            self.telemetry.emit(
+                "laya_decision",
+                {
+                    "session_id": self.session_id,
+                    "action": decision.action if decision else "NONE",
+                    "confidence": round(decision.confidence, 4) if decision else 0.0,
+                    "position_before": pos.side.value,
+                    "position_after": self.fsm.current_state.value,
+                    "question_options": questions,
+                    "inference_latency_ms": round(latency_ms, 1),
+                    "accepted": bool(accepted),
+                    "result": trigger.value if trigger else "HOLD POSITION",
+                    "timestamp": now_ist().isoformat(),
+                },
             )
 
         # 10. Execute atomic transitions if trigger fired
@@ -191,6 +229,9 @@ class FinLayaStrategy:
                 ended_at=now_ist().isoformat(),
             )
 
+        if self.telemetry:
+            self.telemetry.record_heartbeat(session_id=self.session_id, status="COMPLETED")
+
     async def run(self) -> None:
         """Run the strategy session until forced exit."""
         self._running = True
@@ -208,6 +249,9 @@ class FinLayaStrategy:
                 logger.info("Forced exit time reached (>= 15:13:00 IST).", LogEvent.FORCED_EXIT)
                 await self.execute_forced_exit()
                 break
+
+            if self.telemetry:
+                self.telemetry.record_heartbeat(session_id=self.session_id, status="RUNNING")
 
             await self.run_step()
             await self.trading_clock.scheduler.sleep_until_next_tick()

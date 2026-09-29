@@ -310,7 +310,40 @@ Total Trading Sessions: 1
 
 ---
 
-## 13. Database Schema
+## 13. Real-Time Trading Dashboard
+
+FinLaya features an independent, desktop-first real-time trading dashboard built with **FastAPI**, **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS v4**.
+
+It is strictly a **read-only observability interface**:
+* Zero trade execution buttons or mutation endpoints.
+* Live WebSocket telemetry stream (NIFTY quotes, CE/PE depth, Laya decisions every 0.5s, positions, fills, P&L curve).
+* Bot liveness detection with automatic `BOT OFFLINE` indicator when heartbeat expires.
+* Adheres to `design-taste-frontend` (dark cockpit aesthetic, monospace tabular numbers, zero AI illustrations or chatbots) and `emil-design-eng` (smooth micro-transitions, zero jitter).
+
+### Two-Terminal Workflow:
+
+#### Terminal 1 — FinLaya Bot:
+```bash
+uv run finlaya run
+```
+*Continues standard rich terminal logging.*
+
+#### Terminal 2 — Dashboard Server:
+```bash
+uv run finlaya-dashboard
+```
+*Launches dashboard backend on `http://127.0.0.1:8765` and serves the pre-compiled React frontend.*
+
+### Synthetic Simulation & Mock Mode:
+To develop or visually inspect the dashboard without starting the trading bot or Upstox:
+```bash
+uv run finlaya-dashboard --mock
+```
+*Launches with `MOCK DATA` banner, streaming synthetic 0.5s Laya decisions, NIFTY spot ticks, position switches, and live P&L curve.*
+
+---
+
+## 14. Database Schema
 
 The SQLite database (`data/finlaya.db`) contains six core tables with indexes:
 * `trading_sessions`: Session dates, start/end timestamps, spot at start, fixed strike, expiry, CE/PE keys, lot sizes, and final status.

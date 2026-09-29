@@ -15,6 +15,7 @@ from finlaya.market.state import InstrumentQuote, MarketDataCache
 from finlaya.risk.risk_engine import RiskEngine
 from finlaya.scheduler.trading_clock import TradingClock
 from finlaya.strategy.strategy import FinLayaStrategy
+from finlaya.dashboard.telemetry import TelemetryBroadcaster
 from finlaya.utils.time import now_ist
 
 
@@ -81,7 +82,10 @@ async def main(db_path: str = "data/finlaya_dev.db"):
         ("HOLD", 0.65),  # 5. Holds LONG_PE
     ])
 
-    broker = PaperBroker(cache=cache, ce_key=ce_key, pe_key=pe_key, repository=repo)
+    telemetry = TelemetryBroadcaster()
+    telemetry.record_heartbeat(session_id=session_id, status="RUNNING")
+
+    broker = PaperBroker(cache=cache, ce_key=ce_key, pe_key=pe_key, repository=repo, telemetry=telemetry)
     order_mgr = AtomicOrderManager(
         broker=broker,
         ce_key=ce_key,
@@ -108,6 +112,7 @@ async def main(db_path: str = "data/finlaya_dev.db"):
         trading_clock=trading_clock,
         nifty_key=nifty_key,
         repository=repo,
+        telemetry=telemetry,
     )
 
     # Tick 1: BUY -> opens LONG_CE

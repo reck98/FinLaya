@@ -28,6 +28,7 @@ from finlaya.risk.risk_engine import RiskEngine
 from finlaya.scheduler.trading_clock import TradingClock
 from finlaya.strategy.strike_selector import StrikeSelector
 from finlaya.strategy.strategy import FinLayaStrategy
+from finlaya.dashboard.telemetry import TelemetryBroadcaster
 from finlaya.utils.time import now_ist
 
 app = typer.Typer(help="FinLaya — Local Laya NIFTY Options Paper-Trading System")
@@ -267,7 +268,21 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
         logger.set_session_id(session_id)
         console.print(f"[bold green]Trading session #{session_id} initialized in database.[/bold green]")
 
-        # 8. Load / Warm Laya Decision Model
+        # 8. Initialize Telemetry Broadcaster for Dashboard
+        telemetry = TelemetryBroadcaster()
+        telemetry.record_heartbeat(
+            session_id=session_id,
+            status="RUNNING",
+            metadata={
+                "selected_strike": selected_strike,
+                "expiry": target_expiry,
+                "ce_symbol": ce_meta.trading_symbol,
+                "pe_symbol": pe_meta.trading_symbol,
+                "lot_size": ce_meta.lot_size,
+            },
+        )
+
+        # 9. Load / Warm Laya Decision Model
         if use_mock_laya:
             logger.info("Using MockDecisionModel for simulation", LogEvent.LAYA_LOADED)
             model = MockDecisionModel()
@@ -278,9 +293,11 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
             if not model.health_check():
                 logger.error("Laya health check failed. Aborting session.", LogEvent.ERROR)
                 await repo.update_session_status(session_id, status="ABORTED")
+                telemetry.record_heartbeat(session_id=session_id, status="ABORTED")
+                telemetry.close()
                 sys.exit(1)
 
-        # 9. Market Data & Execution Setup
+        # 10. Market Data & Execution Setup
         cache = MarketDataCache()
         candle_engine = CandleEngine(max_candles=config.market_data.historical_candles)
         feature_engine = FeatureEngine(
@@ -298,6 +315,7 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
             pe_key=pe_meta.instrument_key,
             price_fallback=config.paper_trading.price_fallback,
             repository=repo,
+            telemetry=telemetry,
         )
 
         order_manager = AtomicOrderManager(
@@ -322,12 +340,12 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
             decision_interval_seconds=config.strategy.decision_interval_seconds,
         )
 
-        # 10. Connect Market Data WebSocket
+        # 11. Connect Market Data WebSocket
         ws_feed = UpstoxMarketDataFeed(api_client=upstox.api_client, cache=cache)
         ws_feed.subscribe([NIFTY_UNDERLYING_KEY, ce_meta.instrument_key, pe_meta.instrument_key])
         await ws_feed.connect()
 
-        # 11. Run Strategy
+        # 12. Run Strategy
         strategy = FinLayaStrategy(
             session_id=session_id,
             config=config,
@@ -341,11 +359,14 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
             trading_clock=trading_clock,
             nifty_key=NIFTY_UNDERLYING_KEY,
             repository=repo,
+            telemetry=telemetry,
         )
 
         try:
             await strategy.run()
         finally:
+            telemetry.record_heartbeat(session_id=session_id, status="COMPLETED")
+            telemetry.close()
             await ws_feed.disconnect()
 
     asyncio.run(_run())

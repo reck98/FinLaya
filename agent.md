@@ -230,5 +230,48 @@ The repository includes project-scoped skills installed via `npx skills` into `.
 * Restore skills from lockfile: `npx skills experimental_install`
 * Add additional skills: `npx skills add <owner>/<repo> -y`
 * List installed skills: `npx skills list`
-* Update installed skills: `npx skills update`
+* Update skills: `npx skills update`
 
+---
+
+## 11. FinLaya Real-Time Trading Dashboard
+
+FinLaya includes an independent, desktop-first real-time trading dashboard built with **FastAPI**, **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS v4**.
+
+### A. Key Invariants & Safety
+1. **STRICTLY READ-ONLY**: The dashboard does NOT have buy/sell/close buttons or endpoints. It cannot modify positions, submit orders, or call Laya directly.
+2. **ZERO IMPACT ON 0.5s LOOP**: The bot communicates with the dashboard using non-blocking local UDP loopback (`127.0.0.1:8766`). Telemetry emissions take $< 0.01\text{ms}$. If the dashboard is not running or crashes, packets drop silently without delay.
+3. **HEARTBEAT & LIVENESS**: The bot writes `data/runtime/heartbeat.json` and emits `heartbeat` events. If no heartbeat arrives for $> 3.0\text{s}$, the dashboard displays `BOT OFFLINE (Last heartbeat: Xs ago)`.
+
+### B. Two-Terminal Workflow
+* **Terminal 1 (FinLaya Bot)**:
+  ```bash
+  uv run finlaya run
+  ```
+  *(Continues standard structured terminal logging without interference).*
+* **Terminal 2 (FinLaya Dashboard)**:
+  ```bash
+  uv run finlaya-dashboard
+  ```
+  *(Launches FastAPI server and serves the React dashboard on `http://127.0.0.1:8765`).*
+
+### C. Synthetic Simulation & Mock Mode
+To develop, visually test, or demonstrate the dashboard without running the live trading bot or connecting to Upstox:
+```bash
+uv run finlaya-dashboard --mock
+```
+This activates `MockEventGenerator`, which streams realistic NIFTY ticks, option quotes, Laya decisions every 0.5s, position changes, and P&L curves. A prominent `MOCK DATA` badge is displayed in the status bar.
+
+### D. Frontend Development & Build Commands
+* Directory: `frontend/`
+* Dev Server with Vite proxy:
+  ```bash
+  cd frontend
+  npm run dev
+  ```
+* Production Build:
+  ```bash
+  cd frontend
+  npm run build
+  ```
+  Built assets reside in `frontend/dist` and are copied to `src/finlaya/dashboard/static` for self-contained serving.
