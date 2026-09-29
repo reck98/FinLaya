@@ -243,34 +243,120 @@ logging:
 
 ---
 
-## 11. Running the System
+## 11. How to Start FinLaya (Trading Bot)
 
-### System Validation & Connectivity Check
-Verify environment, dependencies, and configuration:
+FinLaya runs as a deterministic, observable quantitative trading process in **Terminal 1**.
+
+### Step 1: Pre-Session Validation
+Verify your virtual environment, dependencies, directories, and configuration:
 ```bash
-uv run python scripts/verify_environment.py
 uv run finlaya validate
 ```
 
-Verify Upstox connectivity, spot quote, and option chain discovery:
+### Step 2: Download & Cache Model Weights
+Download the official open-source Laya weights (`convaiinnovations/laya`) locally into memory/cache:
+```bash
+uv run finlaya download-model
+```
+
+### Step 3: Upstox Connectivity & Option Chain Discovery
+Verify that your `UPSTOX_ACCESS_TOKEN` is active, the exchange is open, and option contracts are resolvable:
 ```bash
 uv run finlaya check-upstox
 ```
 
-### Start Live Paper Trading
+### Step 4: Launch the Live Paper-Trading Session
 ```bash
 uv run finlaya run
 ```
+* **Trading Start**: `09:27:00 Asia/Kolkata`
+* **Forced Exit**: `15:13:00 Asia/Kolkata`
+* Terminal 1 will stream structured live logs with sub-millisecond precision.
 
-### Run Offline Simulation (Mocked Market Data & Mock Laya)
-To test the complete end-to-end lifecycle offline outside market hours:
-```bash
-uv run python scripts/run_simulation.py
-```
+#### Available Bot Options:
+* `uv run finlaya run --config-path <path>`: Custom configuration file (default: `config/config.yaml`).
+* `uv run finlaya run --use-mock-laya`: Runs using `MockDecisionModel` instead of neural weights (ideal for local testing).
 
 ---
 
-## 12. Inspecting Research Telemetry
+## 12. How to Start the Real-Time Dashboard
+
+FinLaya includes an independent, desktop-first real-time trading dashboard built with **FastAPI**, **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS v4**.
+
+The dashboard runs independently in **Terminal 2** and communicates with the trading bot over zero-latency local loopback UDP (`127.0.0.1:8766`).
+
+### Start the Dashboard Server:
+In a separate terminal window:
+```bash
+uv run finlaya-dashboard
+```
+Open your browser and navigate to:
+```
+http://127.0.0.1:8765
+```
+
+### Available Dashboard Flags:
+| Flag | Short | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `--port` | `-p` | HTTP & WebSocket port to listen on | `8765` |
+| `--host` | `-h` | Host network interface to bind | `127.0.0.1` |
+| `--mock` | | Launch with synthetic real-time event generator (`MOCK DATA`) | `false` |
+| `--production` | | Serve pre-compiled React frontend bundle | `false` |
+| `--db-path` | | Path to SQLite paper-trading database | `data/finlaya.db` |
+
+---
+
+## 13. The Two-Terminal Workflow
+
+The standard operational workflow runs FinLaya across two independent terminals:
+
+### Terminal 1 — Trading Bot:
+```bash
+uv run finlaya run
+```
+* Shows live structured trading logs:
+  ```text
+  09:27:00 INFO  FinLaya paper-trading system starting...
+  09:27:00 INFO  NIFTY spot: 23456.25 -> Selected Strike: 23450
+  09:27:00 INFO  CE: NIFTY26OCT23450CE, PE: NIFTY26OCT23450PE
+  09:27:00 INFO  Laya decision loop started (0.5s interval)
+  09:27:00 INFO  Laya Decision: BUY (conf=0.7420, latency=18.4ms)
+  09:27:00 INFO  Paper order #1 FILLED: BUY 65x NIFTY26OCT23450CE @ 151.20
+  09:27:00 INFO  Position: LONG_CE
+  ```
+
+### Terminal 2 — Real-Time Dashboard:
+```bash
+uv run finlaya-dashboard
+```
+* Serves the real-time observability terminal at `http://127.0.0.1:8765`.
+* Displays live NIFTY ticks, CE/PE quotes, Laya decision confidence, position status, P&L curve, and execution log.
+* If the bot stops or crashes, the dashboard detects heartbeat loss after 3 seconds and displays `BOT OFFLINE (Last heartbeat: Xs ago)`.
+
+---
+
+## 14. Offline Simulation & Mock Modes
+
+You can run and test both the bot and dashboard offline outside market hours without an Upstox access token:
+
+### Option A: Standalone Mock Dashboard
+Run the dashboard with synthetic real-time market data and simulated Laya decisions:
+```bash
+uv run finlaya-dashboard --mock
+```
+* Instantly generates live NIFTY ticks wandering around 23,450, simulated CE & PE option depth, Laya decisions every 0.5s, position changes, and live P&L curve.
+* A high-visibility `MOCK DATA` badge is displayed in the status bar.
+
+### Option B: Offline Bot Simulation Script
+Run the scripted 6-tick end-to-end simulation against `data/finlaya_dev.db`:
+```bash
+uv run python scripts/run_simulation.py
+```
+* If `uv run finlaya-dashboard` is open in Terminal 2, it will automatically receive live simulation telemetry via UDP loopback!
+
+---
+
+## 15. Inspecting Research Telemetry
 
 FinLaya captures detailed telemetry in SQLite (`data/finlaya.db`) for quantitative analysis.
 
@@ -278,14 +364,18 @@ Run the inspection utility:
 ```bash
 uv run finlaya inspect-db
 ```
+Or inspect a development database:
+```bash
+uv run finlaya inspect-db --db-path data/finlaya_dev.db
+```
 Or use the standalone quantitative analysis script:
 ```bash
-uv run python scripts/inspect_database.py
+uv run python scripts/inspect_database.py --db data/finlaya_dev.db
 ```
 
 ### Sample Output:
 ```text
-=== FinLaya Database: data/finlaya.db ===
+=== FinLaya Database: data/finlaya_dev.db ===
 Total Trading Sessions: 1
 
 === Quantitative Telemetry: Session #1 (2026-09-29) ===
@@ -310,40 +400,7 @@ Total Trading Sessions: 1
 
 ---
 
-## 13. Real-Time Trading Dashboard
-
-FinLaya features an independent, desktop-first real-time trading dashboard built with **FastAPI**, **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS v4**.
-
-It is strictly a **read-only observability interface**:
-* Zero trade execution buttons or mutation endpoints.
-* Live WebSocket telemetry stream (NIFTY quotes, CE/PE depth, Laya decisions every 0.5s, positions, fills, P&L curve).
-* Bot liveness detection with automatic `BOT OFFLINE` indicator when heartbeat expires.
-* Adheres to `design-taste-frontend` (dark cockpit aesthetic, monospace tabular numbers, zero AI illustrations or chatbots) and `emil-design-eng` (smooth micro-transitions, zero jitter).
-
-### Two-Terminal Workflow:
-
-#### Terminal 1 — FinLaya Bot:
-```bash
-uv run finlaya run
-```
-*Continues standard rich terminal logging.*
-
-#### Terminal 2 — Dashboard Server:
-```bash
-uv run finlaya-dashboard
-```
-*Launches dashboard backend on `http://127.0.0.1:8765` and serves the pre-compiled React frontend.*
-
-### Synthetic Simulation & Mock Mode:
-To develop or visually inspect the dashboard without starting the trading bot or Upstox:
-```bash
-uv run finlaya-dashboard --mock
-```
-*Launches with `MOCK DATA` banner, streaming synthetic 0.5s Laya decisions, NIFTY spot ticks, position switches, and live P&L curve.*
-
----
-
-## 14. Database Schema
+## 16. Database Schema
 
 The SQLite database (`data/finlaya.db`) contains six core tables with indexes:
 * `trading_sessions`: Session dates, start/end timestamps, spot at start, fixed strike, expiry, CE/PE keys, lot sizes, and final status.
@@ -355,7 +412,7 @@ The SQLite database (`data/finlaya.db`) contains six core tables with indexes:
 
 ---
 
-## 14. Testing Suite
+## 17. Testing Suite
 
 FinLaya has an extensive automated test suite covering unit behaviors, state machines, atomic transitions, and end-to-end simulations with 100% pass rate:
 
@@ -378,7 +435,7 @@ uv run pytest tests -v
 
 ---
 
-## 15. Official Resources & References
+## 18. Official Resources & References
 
 * **Laya GitHub**: [https://github.com/NandhaKishorM/laya](https://github.com/NandhaKishorM/laya)
 * **Laya Hugging Face**: [https://huggingface.co/convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)

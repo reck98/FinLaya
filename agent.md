@@ -255,14 +255,28 @@ FinLaya includes an independent, desktop-first real-time trading dashboard built
   ```
   *(Launches FastAPI server and serves the React dashboard on `http://127.0.0.1:8765`).*
 
-### C. Synthetic Simulation & Mock Mode
+### C. Available CLI Commands & Flags
+* **Bot Commands**:
+  * `uv run finlaya validate`: Validates `.env`, directories, and config.
+  * `uv run finlaya download-model`: Caches Laya neural weights locally and runs startup warmup.
+  * `uv run finlaya check-upstox`: Validates Upstox connectivity, spot quote, and option chain discovery.
+  * `uv run finlaya run`: Starts the paper trading session (09:27 - 15:13 IST).
+  * `uv run finlaya run --use-mock-laya`: Runs using `MockDecisionModel` instead of neural weights.
+  * `uv run finlaya inspect-db`: Displays session summary and quantitative metrics.
+* **Dashboard Commands**:
+  * `uv run finlaya-dashboard`: Starts the server on default port `8765`.
+  * `uv run finlaya-dashboard --port 8080`: Runs on custom port.
+  * `uv run finlaya-dashboard --mock`: Starts in standalone mock simulation mode (`MOCK DATA`).
+  * `uv run finlaya-dashboard --db-path data/finlaya_dev.db`: Points dashboard to dev database.
+
+### D. Synthetic Simulation & Mock Mode
 To develop, visually test, or demonstrate the dashboard without running the live trading bot or connecting to Upstox:
 ```bash
 uv run finlaya-dashboard --mock
 ```
 This activates `MockEventGenerator`, which streams realistic NIFTY ticks, option quotes, Laya decisions every 0.5s, position changes, and P&L curves. A prominent `MOCK DATA` badge is displayed in the status bar.
 
-### D. Frontend Development & Build Commands
+### E. Frontend Development & Build Commands
 * Directory: `frontend/`
 * Dev Server with Vite proxy:
   ```bash
@@ -274,4 +288,10 @@ This activates `MockEventGenerator`, which streams realistic NIFTY ticks, option
   cd frontend
   npm run build
   ```
-  Built assets reside in `frontend/dist` and are copied to `src/finlaya/dashboard/static` for self-contained serving.
+  Built assets reside in `frontend/dist` and must be copied to `src/finlaya/dashboard/static` for self-contained serving.
+
+### F. Testing the Dashboard
+Run all backend dashboard and IPC unit tests:
+```bash
+uv run pytest tests/unit/test_dashboard_backend.py -v
+```
