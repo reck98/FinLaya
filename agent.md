@@ -190,3 +190,45 @@ When adding features in future work:
 2. **Additional Indicators**: Add mathematical functions to [`src/finlaya/market/indicators.py`](file:///E:/Development/PlayGround/FinLaya/src/finlaya/market/indicators.py). Ensure they return `None` when insufficient candles exist.
 3. **Strategy Invariants**: Do NOT introduce stop-loss, take-profit, trailing stops, dynamic strike rolling, or options selling unless explicitly requested as a new experimental strategy branch.
 4. **Always update `agent.md`** whenever modifying workflows, protocols, or database schemas.
+
+---
+
+## 10. Installed Agent Skills
+
+The repository includes project-scoped skills installed via `npx skills` into `.agents/skills/`:
+
+### A. Emil Kowalski Motion & UI Engineering Suite (`emilkowalski/skill`)
+* `animate`: Decisions and implementations for fluid web motion, springs, and interactive transitions.
+* `animate-expo`: React Native and Expo animation engine using Reanimated and Gesture Handler.
+* `animation-vocabulary`: Reverse lookup glossary for motion design terminology.
+* `apple-design`: Apple interface guidelines, fluid gestures, momentum, translucency, and spatial consistency.
+* `ask-sonner`: Integration guide and troubleshooting for the Sonner toast notification library.
+* `emil-design-eng`: UI polish, component feel, and micro-interactions philosophy.
+* `find-animation-opportunities`: Audit codebase for static UI elements that benefit from motion.
+* `improve-animations`: Motion critique and prioritization audit for existing animations.
+* `mobile-native`: Web-to-native mobile polish (touch highlights, 100vh bugs, gesture handling).
+* `pick-ui-library`: Evaluates and selects component libraries based on stack requirements.
+* `prototype`: Rapid interactive prototyping patterns.
+* `review-animations`: Code review checklist for physics, interruptibility, and 60fps execution.
+* `write-swift`: Swift 6 concurrency, value types, and modern Swift best practices.
+
+### B. Taste Skill Suite (`Leonxlnx/taste-skill`)
+* `brandkit`: High-end brand guidelines, logo systems, and visual identity boards.
+* `design-taste-frontend` & `v1`: Anti-slop frontend engineering for landing pages, web apps, and dashboards.
+* `full-output-enforcement`: Overrides truncation behavior for complete, unabridged code generation.
+* `gpt-taste`: Advanced UX/UI and GSAP motion engineering.
+* `high-end-visual-design`: Premium typography, spacing, depth, and layout standards.
+* `image-to-code`: Translates UI mockups and visual designs into clean frontend code.
+* `imagegen-frontend-mobile`: Generates mobile screen concepts and app flows.
+* `imagegen-frontend-web`: Generates section-by-section web design references.
+* `industrial-brutalist-ui`: Swiss typographic print fused with military terminal aesthetics.
+* `minimalist-ui`: Editorial layouts, warm monochrome palettes, typographic contrast, and bento grids.
+* `redesign-existing-projects`: Upgrades existing user interfaces to premium standards without breaking functionality.
+* `stitch-design-taste`: Semantic design system standards for Google Stitch.
+
+### Managing Skills:
+* Restore skills from lockfile: `npx skills experimental_install`
+* Add additional skills: `npx skills add <owner>/<repo> -y`
+* List installed skills: `npx skills list`
+* Update installed skills: `npx skills update`
+
