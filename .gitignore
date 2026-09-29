@@ -14,10 +14,10 @@ ENV/
 .env.local
 
 # Databases and runtime data
-data/finlaya.db
-data/finlaya.db-journal
-data/finlaya.db-wal
-data/finlaya.db-shm
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
 data/logs/*.log
 data/logs/*.jsonl
 data/runtime/*

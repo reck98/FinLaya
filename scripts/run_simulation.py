@@ -18,15 +18,15 @@ from finlaya.strategy.strategy import FinLayaStrategy
 from finlaya.utils.time import now_ist
 
 
-async def main():
+async def main(db_path: str = "data/finlaya_dev.db"):
     print("=" * 60)
-    print("Running FinLaya End-to-End Simulation")
+    print(f"Running FinLaya End-to-End Simulation (DB: {db_path})")
     print("=" * 60)
 
     config = load_config()
-    db_engine = DatabaseEngine(config.database.path)
+    db_engine = DatabaseEngine(db_path)
     await db_engine.initialize()
-    repo = SqliteRepository(config.database.path)
+    repo = SqliteRepository(db_path)
 
     nifty_key = "NSE_INDEX|Nifty 50"
     ce_key = "NSE_FO|NIFTY26OCT23450CE"
@@ -149,4 +149,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser(description="Run simulated paper-trading session.")
+    parser.add_argument("--db", default="data/finlaya_dev.db", help="Path to SQLite database (default: data/finlaya_dev.db)")
+    args = parser.parse_args()
+    asyncio.run(main(db_path=args.db))

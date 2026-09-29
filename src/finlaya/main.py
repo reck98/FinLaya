@@ -149,10 +149,19 @@ def check_upstox(config_path: str = "config/config.yaml") -> None:
 def inspect_db(db_path: str = "data/finlaya.db") -> None:
     """Inspect recent session telemetry and performance in the SQLite database."""
     async def _inspect():
+        if not Path(db_path).exists():
+            console.print(f"[yellow]Database '{db_path}' does not exist. No trades have been executed yet.[/yellow]")
+            return
+
         repo = SqliteRepository(db_path)
-        session = await repo.get_latest_session()
+        try:
+            session = await repo.get_latest_session()
+        except Exception:
+            console.print(f"[yellow]Database '{db_path}' contains no trading tables or sessions (clean state).[/yellow]")
+            return
+
         if not session or not session.id:
-            console.print("[yellow]No trading sessions found in database.[/yellow]")
+            console.print(f"[yellow]Database '{db_path}' contains zero trading sessions.[/yellow]")
             return
 
         stats = await repo.get_session_stats(session.id)
