@@ -260,7 +260,7 @@ uv run finlaya download-model
 ```
 
 ### Step 3: Upstox Connectivity & Option Chain Discovery
-Verify that your `UPSTOX_ACCESS_TOKEN` is active, the exchange is open, and option contracts are resolvable:
+Verify that your `UPSTOX_ACCESS_TOKEN` is active, the exchange is open, spot price is fetched via Upstox REST API v2, and option contracts are resolvable:
 ```bash
 uv run finlaya check-upstox
 ```
@@ -271,11 +271,13 @@ uv run finlaya run
 ```
 * **Trading Start**: `09:27:00 Asia/Kolkata`
 * **Forced Exit**: `15:13:00 Asia/Kolkata`
-* Terminal 1 will stream structured live logs with sub-millisecond precision.
+* Terminal 1 streams colorized live logs with clear component colors and decision cycle spacing.
+* **Graceful Shutdown**: Press `Ctrl+C` at any time to cleanly square off active positions, mark the session as `STOPPED` in the database, and exit without tracebacks.
 
 #### Available Bot Options:
 * `uv run finlaya run --config-path <path>`: Custom configuration file (default: `config/config.yaml`).
 * `uv run finlaya run --use-mock-laya`: Runs using `MockDecisionModel` instead of neural weights (ideal for local testing).
+* **Verbose Model Inspection**: Set `laya.log_full_inference: true` in `config/config.yaml` to view the full market state, typed questions, and raw Laya softmax probabilities and token usage for each decision.
 
 ---
 
@@ -430,6 +432,8 @@ uv run pytest tests -v
 * `test_paper_broker.py`: Simulated fills (ask for BUY, bid for SELL, LTP fallback) and P&L tracking.
 * `test_trading_clock.py`: IST session phases and schedules.
 * `test_risk_engine.py`: Single-lot and no-pyramiding constraints.
+* `test_spot_price.py`: Upstox REST market quote and LTP parsing, OpenAPI model handling, and fail-closed error handling.
+* `test_graceful_shutdown.py`: Graceful shutdown signal handling, position square-offs, colored console log formatting, and verbose Laya inspection.
 * `test_atomic_transitions.py`: Asynchronous two-phase switching (`LONG_CE -> FLAT -> LONG_PE` and vice versa).
 * `test_end_to_end_simulation.py`: Full mock session lifecycle with complete SQLite persistence.
 

@@ -65,6 +65,80 @@ class SecretRedactingFormatter(logging.Formatter):
         return redact_secrets(msg)
 
 
+class ColoredConsoleFormatter(SecretRedactingFormatter):
+    """Console formatter adding ANSI colors and cycle bifurcation while redacting secrets."""
+
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+
+    COMPONENT_COLORS = {
+        "strategy": "\033[95m",          # Bright Magenta
+        "state_machine": "\033[94m",     # Bright Blue
+        "upstox_market_data": "\033[93m",# Bright Yellow
+        "upstox_client": "\033[33m",     # Yellow
+        "upstox_instruments": "\033[33m",
+        "paper_broker": "\033[92m",      # Bright Green
+        "order_manager": "\033[32m",     # Green
+        "risk_engine": "\033[91m",       # Bright Red
+        "trading_clock": "\033[36m",     # Cyan
+    }
+
+    LEVEL_COLORS = {
+        "DEBUG": "\033[2m",
+        "INFO": "\033[36m",
+        "WARNING": "\033[1;33m",
+        "ERROR": "\033[1;31m",
+        "CRITICAL": "\033[1;41;37m",
+    }
+
+    EVENT_COLORS = {
+        "LAYA_INFERENCE": "\033[1;96m",
+        "SIGNAL_ACCEPTED": "\033[1;92m",
+        "SIGNAL_REJECTED": "\033[90m",
+        "ORDER_FILLED": "\033[1;92m",
+        "POSITION_OPENED": "\033[1;92m",
+        "POSITION_SWITCH_STARTED": "\033[1;33m",
+        "POSITION_SWITCH_COMPLETED": "\033[1;92m",
+        "FORCED_EXIT": "\033[1;95m",
+        "APPLICATION_START": "\033[1;32m",
+        "ERROR": "\033[1;91m",
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        asctime = self.formatTime(record, self.datefmt)
+        time_styled = f"\033[90m{asctime}\033[0m"
+
+        lvl_color = self.LEVEL_COLORS.get(record.levelname, "")
+        lvl_styled = f"{lvl_color}[{record.levelname}]{self.RESET}"
+
+        comp_name = record.name
+        comp_color = self.COMPONENT_COLORS.get(comp_name, "\033[37m")
+        comp_styled = f"{comp_color}[{comp_name}]{self.RESET}"
+
+        raw_msg = record.getMessage()
+        redacted_msg = redact_secrets(raw_msg)
+
+        event_val = getattr(record, "event", None)
+        leading_newline = ""
+
+        if event_val:
+            event_name = event_val.value if hasattr(event_val, "value") else str(event_val)
+            event_color = self.EVENT_COLORS.get(event_name, "\033[1m")
+            event_badge = f"[{event_name}]"
+            if event_badge in redacted_msg:
+                styled_badge = f"{event_color}{event_badge}{self.RESET}"
+                redacted_msg = redacted_msg.replace(event_badge, styled_badge, 1)
+
+            if event_name == "LAYA_INFERENCE":
+                leading_newline = "\n"
+
+        formatted = f"{leading_newline}{time_styled} {lvl_styled} {comp_styled} {redacted_msg}"
+        if record.exc_info:
+            formatted += f"\n{self.formatException(record.exc_info)}"
+        return formatted
+
+
 class JsonLinesFormatter(logging.Formatter):
     """Formats log records as structured JSON lines."""
 
@@ -166,8 +240,7 @@ def setup_logging(
     if console_enabled:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(level)
-        console_fmt = SecretRedactingFormatter(
-            "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+        console_fmt = ColoredConsoleFormatter(
             datefmt="%Y-%m-%d %H:%M:%S",
         )
         console_handler.setFormatter(console_fmt)

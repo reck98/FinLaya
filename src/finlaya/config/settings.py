@@ -39,6 +39,7 @@ class LayaConfig(BaseModel):
     model: str = "convaiinnovations/laya"
     device: str = "auto"
     confidence_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
+    log_full_inference: bool = False
 
 
 class PaperTradingConfig(BaseModel):
@@ -53,6 +54,7 @@ class DatabaseConfig(BaseModel):
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     directory: str = "data/logs"
+    log_laya_full: bool = False
 
 
 class UpstoxConfig(BaseModel):

@@ -79,6 +79,11 @@
 * Trading start: `09:27:00 IST`.
 * Forced exit: `15:13:00 IST`. At or after 15:13, cancel pending orders, close open positions, verify `FLAT`, and mark session completed.
 
+### F. Upstox API v2 Integration Standards
+* **API Version Argument**: Upstox REST endpoints such as `MarketQuoteApi.get_full_market_quote(symbol, api_version)` and `MarketQuoteApi.ltp(symbol, api_version)` require an explicit `api_version="2.0"` positional argument.
+* **OpenAPI Model Response Parsing**: Response items returned in `resp.data` are instances of SDK OpenAPI models (e.g. `MarketQuoteSymbol` or `MarketQuoteSymbolLtp`). These objects do not provide a `.get()` method. Access attributes via `hasattr(item, "last_price")`, `.to_dict()`, or dictionary fallbacks.
+* **LTP Fallback**: If full market quotes return empty or unparsable data, always fallback to `quote_api.ltp(symbol, api_version="2.0")` before raising an error.
+
 ---
 
 ## 5. Laya Decision Model Guidelines
@@ -102,6 +107,14 @@ class LayaDecision(BaseModel):
 * Record confidence exactly as returned without mathematical transformation.
 * **Fail Safe / Do Nothing**: On malformed output, timeout, or exception, evaluate to `None` and do nothing. Never guess.
 
+### D. Verbose Inference Inspection (`log_full_inference`)
+* When `laya.log_full_inference: true` in `config/config.yaml`, FinLaya renders a formatted ASCII panel in Terminal 1 for every decision cycle.
+* Displays:
+  1. Full market state snapshot (spot, quotes, spreads, OHLC, indicators).
+  2. Deterministic typed choice questions and criteria dictionary.
+  3. Raw Laya model response (choice, softmax choice probabilities, confidence, answer confidence, token usage).
+  4. Decision evaluation outcome, latency, and FSM transition result.
+
 ---
 
 ## 6. Execution Simulation & Order Manager
@@ -123,6 +136,14 @@ Switching between option legs (`LONG_CE -> LONG_PE` or `LONG_PE -> LONG_CE`) is 
 7. Verify target quantity matches configured lot size and position is updated.
 8. Release strategy lock.
 
+### C. Graceful Shutdown (`Ctrl+C` / `SIGINT`)
+* When terminated manually, `strategy.shutdown(reason="USER_INTERRUPT")`:
+  1. Sets `_running = False` to break decision loop.
+  2. Cancels pending paper orders and closes open positions to `FLAT`.
+  3. Updates session status in SQLite database to `STOPPED` with current IST timestamp.
+  4. Emits `status="STOPPED"` heartbeat on telemetry broadcaster.
+  5. Cleanly disconnects Upstox WebSocket feeds and exits with code 0 without unhandled tracebacks.
+
 ---
 
 ## 7. Persistence & Observability
@@ -136,7 +157,9 @@ Switching between option legs (`LONG_CE -> LONG_PE` or `LONG_PE -> LONG_CE`) is 
 * `events`: System lifecycle logs with levels and metadata.
 
 ### Logging Rules
-* Write structured logs to console (`stdout`) and rotating logs in `data/logs/finlaya_YYYYMMDD.log` and `.jsonl`.
+* **Colored Console Formatter**: Terminal logs use distinct ANSI colors for components (`[strategy]`, `[state_machine]`, `[upstox_market_data]`), log levels (`[INFO]`, `[WARNING]`, `[ERROR]`), and event badges.
+* **Visual Bifurcation**: Automatically prepends a blank newline space before each `[LAYA_INFERENCE]` decision cycle on console.
+* **Disk Logs**: Writes clean, non-colored structured logs to `data/logs/finlaya_YYYYMMDD.log` and structured `.jsonl`.
 * **Redaction**: Never log access tokens, API keys, or authorization headers. All matching regex patterns must be replaced with `[REDACTED]`.
 
 ---
@@ -147,7 +170,7 @@ Switching between option legs (`LONG_CE -> LONG_PE` or `LONG_PE -> LONG_CE`) is 
 ```bash
 uv run pytest tests -v
 ```
-All 39 unit and integration tests must pass.
+All 53 unit and integration tests must pass.
 
 ### Run Environment Verification
 ```bash

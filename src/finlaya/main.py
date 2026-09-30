@@ -364,12 +364,24 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
 
         try:
             await strategy.run()
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            console.print("\n[bold yellow][!] Shutdown signal received (Ctrl+C). Initiating graceful shutdown...[/bold yellow]")
+            await strategy.shutdown(reason="USER_INTERRUPT")
+        except Exception as e:
+            logger.error(f"Fatal error in strategy session: {e}", LogEvent.ERROR, exc_info=True)
+            await strategy.shutdown(reason=f"ERROR_{type(e).__name__}")
+            raise
         finally:
-            telemetry.record_heartbeat(session_id=session_id, status="COMPLETED")
             telemetry.close()
             await ws_feed.disconnect()
 
-    asyncio.run(_run())
+    try:
+        asyncio.run(_run())
+        console.print("[bold green][OK] FinLaya session finished cleanly.[/bold green]")
+    except KeyboardInterrupt:
+        console.print("[bold green][OK] FinLaya session terminated cleanly.[/bold green]")
+        sys.exit(0)
+
 
 
 if __name__ == "__main__":

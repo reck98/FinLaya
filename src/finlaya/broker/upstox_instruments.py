@@ -188,13 +188,24 @@ class UpstoxInstrumentService:
 
         return ce_meta, pe_meta
 
+    @staticmethod
+    def _extract_last_price(item: Any) -> float:
+        """Extract last_price from SDK model or dict."""
+        if hasattr(item, "last_price") and item.last_price is not None:
+            return float(item.last_price)
+        if hasattr(item, "to_dict"):
+            return float(item.to_dict().get("last_price") or 0.0)
+        if isinstance(item, dict):
+            return float(item.get("last_price") or 0.0)
+        return 0.0
+
     def get_spot_price(self) -> float:
         """Fetch current live NIFTY 50 spot price from Upstox REST API."""
         quote_api = upstox_client.MarketQuoteApi(self.api_client)
         try:
-            resp = quote_api.get_full_market_quote(NIFTY_UNDERLYING_KEY)
+            resp = quote_api.get_full_market_quote(symbol=NIFTY_UNDERLYING_KEY, api_version="2.0")
             data = resp.data if hasattr(resp, "data") else {}
-            # Upstox returns keys with colon or pipe format
+            # Upstox returns keys with colon or pipe format e.g. 'NSE_INDEX:Nifty 50'
             nifty_data = None
             if hasattr(data, "to_dict"):
                 data = data.to_dict()
@@ -208,7 +219,16 @@ class UpstoxInstrumentService:
                 nifty_data = next(iter(data.values()))
 
             if nifty_data:
-                ltp = float(nifty_data.get("last_price", 0.0))
+                ltp = self._extract_last_price(nifty_data)
+                if ltp > 0:
+                    return ltp
+
+            # Fallback to lightweight LTP endpoint
+            ltp_resp = quote_api.ltp(symbol=NIFTY_UNDERLYING_KEY, api_version="2.0")
+            ltp_data = ltp_resp.data if hasattr(ltp_resp, "data") else {}
+            if ltp_data:
+                item = next(iter(ltp_data.values()))
+                ltp = self._extract_last_price(item)
                 if ltp > 0:
                     return ltp
 
@@ -216,3 +236,4 @@ class UpstoxInstrumentService:
         except Exception as e:
             logger.error(f"Failed to fetch NIFTY spot price: {e}", LogEvent.ERROR)
             raise
+

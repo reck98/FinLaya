@@ -21,6 +21,7 @@ class LayaDecisionModel:
         self.device = device
         self._model: Any = None
         self._loaded: bool = False
+        self.last_raw_response: dict[str, Any] | None = None
 
     def is_loaded(self) -> bool:
         return self._loaded
@@ -92,11 +93,13 @@ class LayaDecisionModel:
 
             raw_res = self._model.predict(state_input, questions)
             latency_ms = (time.perf_counter() - t0) * 1000.0
+            self.last_raw_response = raw_res if isinstance(raw_res, dict) else {"raw": str(raw_res)}
 
             decision = self._parse_response(raw_res)
             return decision, latency_ms
         except Exception as e:
             latency_ms = (time.perf_counter() - t0) * 1000.0
+            self.last_raw_response = {"error": str(e)}
             logger.warning(f"Laya inference exception ({e}). Failing safe with DO NOTHING.", LogEvent.ERROR)
             return None, latency_ms
 
@@ -154,6 +157,7 @@ class MockDecisionModel:
         self.latency_ms = latency_ms
         self._loaded: bool = False
         self._scripted_responses: list[tuple[str, float]] = []
+        self.last_raw_response: dict[str, Any] | None = None
 
     def set_scripted_responses(self, responses: list[tuple[str, float]]) -> None:
         """Set an explicit sequence of (action, confidence) tuples for test execution."""
@@ -171,6 +175,29 @@ class MockDecisionModel:
 
         if self._scripted_responses:
             action, conf = self._scripted_responses.pop(0)
+            self.last_raw_response = {
+                "answers": {
+                    "trading_action": {
+                        "type": "choice",
+                        "choice": action,
+                        "confidence": conf,
+                        "probabilities": {action: conf, "OTHER": round(max(0.0, 1.0 - conf), 4)},
+                    }
+                },
+                "usage": {"input_tokens": 30, "output_tokens": 0},
+            }
             return LayaDecision(action=action, confidence=conf), self.latency_ms  # type: ignore
 
+        self.last_raw_response = {
+            "answers": {
+                "trading_action": {
+                    "type": "choice",
+                    "choice": self.default_action,
+                    "confidence": self.default_confidence,
+                    "probabilities": {self.default_action: self.default_confidence, "OTHER": round(max(0.0, 1.0 - self.default_confidence), 4)},
+                }
+            },
+            "usage": {"input_tokens": 30, "output_tokens": 0},
+        }
         return LayaDecision(action=self.default_action, confidence=self.default_confidence), self.latency_ms  # type: ignore
+

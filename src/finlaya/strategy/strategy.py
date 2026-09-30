@@ -150,6 +150,24 @@ class FinLayaStrategy:
         # 8. Evaluate decision through strategy FSM
         trigger, accepted, reason = self.fsm.evaluate_decision(decision)
 
+        # Check if full verbose Laya inspection is enabled in config
+        log_full = (
+            getattr(self.config.laya, "log_full_inference", False)
+            or getattr(self.config.logging, "log_laya_full", False)
+        )
+        if log_full:
+            raw_res = getattr(self.model, "last_raw_response", None)
+            self._render_verbose_inference(
+                snapshot=snapshot,
+                questions=questions,
+                raw_response=raw_res,
+                decision=decision,
+                latency_ms=latency_ms,
+                trigger=trigger,
+                accepted=accepted,
+                reason=reason,
+            )
+
         # 9. Persist decision record to database
         if self.repository:
             await self.repository.save_laya_decision(
@@ -208,6 +226,61 @@ class FinLayaStrategy:
         # 11. Refresh unrealized P&L
         self.broker.refresh_unrealized_pnl()
 
+    def _render_verbose_inference(
+        self,
+        snapshot: Any,
+        questions: dict[str, Any],
+        raw_response: Any,
+        decision: Any,
+        latency_ms: float,
+        trigger: Any,
+        accepted: bool,
+        reason: str | None = None,
+    ) -> None:
+        """Render structured terminal output of state, question, and raw response safely on all consoles."""
+        from rich import box
+        from rich.console import Console
+        from rich.panel import Panel
+
+        console = Console()
+
+        try:
+            state_dict = json.loads(snapshot.to_laya_json()) if hasattr(snapshot, "to_laya_json") else snapshot
+            state_str = json.dumps(state_dict, indent=2)
+        except Exception:
+            state_str = str(snapshot)
+
+        question_str = json.dumps(questions, indent=2)
+        raw_res_str = json.dumps(raw_response, indent=2) if raw_response is not None else "{}"
+
+        verdict_color = "green" if accepted else "yellow"
+        action_name = decision.action if decision else "NONE"
+        conf_val = decision.confidence if decision else 0.0
+
+        panel_content = (
+            f"[bold cyan]--- 1. MARKET STATE SENT TO LAYA ---[/bold cyan]\n"
+            f"[dim]{state_str}[/dim]\n\n"
+            f"[bold magenta]--- 2. TYPED QUESTION & CRITERIA ---[/bold magenta]\n"
+            f"{question_str}\n\n"
+            f"[bold yellow]--- 3. RAW LAYA MODEL RESPONSE ---[/bold yellow]\n"
+            f"[bold]{raw_res_str}[/bold]\n\n"
+            f"[bold {verdict_color}]--- 4. DECISION EVALUATION ---[/bold {verdict_color}]\n"
+            f"Action: [bold]{action_name}[/bold] | "
+            f"Confidence: [bold]{conf_val:.4f}[/bold] (Threshold: {self.config.strategy.confidence_threshold:.2f}) | "
+            f"Accepted: [{verdict_color}][bold]{accepted}[/bold][/{verdict_color}] | "
+            f"Latency: [bold]{latency_ms:.1f}ms[/bold] | "
+            f"Result: [bold]{trigger.value if trigger else 'HOLD'}[/bold]"
+        )
+
+        console.print(
+            Panel(
+                panel_content,
+                title=f"[bold white on blue] LAYA FULL INFERENCE INSPECTION ({now_ist().strftime('%H:%M:%S IST')}) [/bold white on blue]",
+                border_style="cyan",
+                box=box.ASCII,
+            )
+        )
+
     async def execute_forced_exit(self) -> None:
         """Square off open positions and mark session completed at 15:13."""
         logger.info("Triggering forced exit procedure at 15:13 Asia/Kolkata...", LogEvent.FORCED_EXIT)
@@ -232,8 +305,41 @@ class FinLayaStrategy:
         if self.telemetry:
             self.telemetry.record_heartbeat(session_id=self.session_id, status="COMPLETED")
 
+    async def shutdown(self, reason: str = "GRACEFUL_SHUTDOWN") -> None:
+        """Gracefully stop strategy, cancel orders, square off positions, and update session."""
+        self._running = False
+        logger.info(f"Graceful shutdown initiated ({reason})...", LogEvent.APPLICATION_START)
+
+        # 1. Close all active orders and square off open positions
+        try:
+            await self.order_manager.close_all(self.session_id, reason=reason)
+        except Exception as e:
+            logger.warning(f"Error squaring off positions on shutdown: {e}")
+
+        # 2. Reset FSM to FLAT
+        self.fsm.set_state(StrategyState.FLAT)
+
+        pos = self.broker.get_position()
+        logger.info(
+            f"Strategy shutdown complete: Position={pos.side.value}, Realized P&L = {pos.realized_pnl:+.2f}",
+            LogEvent.SESSION_COMPLETED,
+            metadata={"realized_pnl": pos.realized_pnl, "reason": reason},
+        )
+
+        # 3. Update database session status
+        if self.repository:
+            await self.repository.update_session_status(
+                session_id=self.session_id,
+                status="STOPPED",
+                ended_at=now_ist().isoformat(),
+            )
+
+        # 4. Update telemetry heartbeat
+        if self.telemetry:
+            self.telemetry.record_heartbeat(session_id=self.session_id, status="STOPPED")
+
     async def run(self) -> None:
-        """Run the strategy session until forced exit."""
+        """Run the strategy session until forced exit or stopped."""
         self._running = True
 
         # Pre-market wait if before 09:27
