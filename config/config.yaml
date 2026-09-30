@@ -24,7 +24,7 @@ laya:
   model: "convaiinnovations/laya"
   device: "auto"
   confidence_threshold: 0.50
-  log_full_inference: true
+  log_full_inference: false
 
 paper_trading:
   enabled: true
