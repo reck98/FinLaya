@@ -105,14 +105,18 @@ class UpstoxMarketDataFeed:
             volume = int(mkt.get("vtt", 0))
             oi = int(mkt.get("oi", 0))
 
-            # Market depth level 1
+            # Market depth level 1 (support both Protobuf bidP/askP and JSON bidPrice/askPrice)
             depth = mkt.get("marketLevel", {}).get("bidAskQuote", [])
             if depth and len(depth) > 0:
                 best = depth[0]
-                bid = float(best.get("bidPrice", 0.0)) or None
-                bid_qty = int(best.get("bidQty", 0)) or None
-                ask = float(best.get("askPrice", 0.0)) or None
-                ask_qty = int(best.get("askQty", 0)) or None
+                bid_val = best.get("bidP") if "bidP" in best else best.get("bidPrice")
+                bid = float(bid_val) if bid_val is not None and float(bid_val) > 0 else None
+                bid_q_val = best.get("bidQ") if "bidQ" in best else best.get("bidQty")
+                bid_qty = int(bid_q_val) if bid_q_val is not None and int(bid_q_val) > 0 else None
+                ask_val = best.get("askP") if "askP" in best else best.get("askPrice")
+                ask = float(ask_val) if ask_val is not None and float(ask_val) > 0 else None
+                ask_q_val = best.get("askQ") if "askQ" in best else best.get("askQty")
+                ask_qty = int(ask_q_val) if ask_q_val is not None and int(ask_q_val) > 0 else None
 
             ohlc_list = mkt.get("marketOHLC", {}).get("ohlc", [])
             for o in ohlc_list:

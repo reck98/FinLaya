@@ -103,8 +103,9 @@ class LayaDecision(BaseModel):
     action: Literal["BUY", "SELL", "HOLD"]
     confidence: float  # 0.0 <= confidence <= 1.0
 ```
-* Threshold rule: `confidence >= threshold` (default `0.60`).
-* Record confidence exactly as returned without mathematical transformation.
+* **Threshold Rule**: `confidence > threshold` (default `0.50`, strictly greater than threshold; $\le 0.50$ is rejected).
+* **Softmax Choice Probabilities**: In Laya RL responses, calibrated policy confidence is often near zero, while `probabilities` contains the actual softmax choice distribution across criteria (e.g. `BUY: 0.4878, SELL: 0.5122`) and `answer_confidence` (`0.5122`). `LayaDecisionModel` extracts the choice probability as decision confidence. Signals are accepted only when `confidence > 0.50` (or configured threshold).
+* **Historical Candle Seeding**: At session start, `UpstoxInstrumentService.fetch_historical_candles` seeds `CandleEngine` with 60 completed 1-minute candles (using `HistoryApi.get_intra_day_candle_data` and falling back to prior trading day's 1-minute data via `HistoryApi.get_historical_candle_data1`). This guarantees that all 15 technical indicators (`sma5/10/20`, `ema5/9/20`, `rsi14`, `macd/signal/hist`, `atr14`, `vwap`, `bb_upper/mid/lower`) calculate cleanly with zero nulls right from the first decision tick.
 * **Fail Safe / Do Nothing**: On malformed output, timeout, or exception, evaluate to `None` and do nothing. Never guess.
 
 ### D. Verbose Inference Inspection (`log_full_inference`)

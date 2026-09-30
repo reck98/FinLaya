@@ -28,7 +28,7 @@ class TransitionTrigger(str, Enum):
 class StrategyStateMachine:
     """Manages strategy position state and verifies allowed transitions."""
 
-    def __init__(self, confidence_threshold: float = 0.60):
+    def __init__(self, confidence_threshold: float = 0.50):
         self.confidence_threshold = confidence_threshold
         self._state: StrategyState = StrategyState.FLAT
 
@@ -52,9 +52,9 @@ class StrategyStateMachine:
         action = decision.action
         conf = decision.confidence
 
-        # 1. Confidence threshold check: MUST be >= threshold
-        if conf < self.confidence_threshold:
-            reason = f"Confidence {conf:.4f} < threshold {self.confidence_threshold:.4f}"
+        # 1. Confidence threshold check: MUST be strictly greater than threshold (> 0.50)
+        if conf <= self.confidence_threshold:
+            reason = f"Confidence {conf:.4f} <= threshold {self.confidence_threshold:.4f}"
             logger.info(f"Signal rejected: {action} with {reason}", LogEvent.SIGNAL_REJECTED)
             return TransitionTrigger.NO_ACTION, False, reason
 

@@ -13,17 +13,17 @@ trading:
 
 strategy:
   decision_interval_seconds: 0.5
-  confidence_threshold: 0.60
+  confidence_threshold: 0.50
 
 market_data:
   candle_interval: "1minute"
-  historical_candles: 6
+  historical_candles: 60
   max_staleness_seconds: 2.0
 
 laya:
   model: "convaiinnovations/laya"
   device: "auto"
-  confidence_threshold: 0.60
+  confidence_threshold: 0.50
   log_full_inference: true
 
 paper_trading:

@@ -6,13 +6,13 @@ from finlaya.strategy.state_machine import StrategyStateMachine, StrategyState, 
 
 
 def test_fsm_initial_state_is_flat():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
     assert fsm.current_state == StrategyState.FLAT
 
 
 def test_fsm_flat_to_long_ce():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
-    # BUY >= 0.60
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
+    # BUY > 0.50
     trigger, accepted, reason = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.60))
     assert trigger == TransitionTrigger.OPEN_LONG_CE
     assert accepted is True
@@ -22,8 +22,8 @@ def test_fsm_flat_to_long_ce():
 
 
 def test_fsm_flat_to_long_pe():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
-    # SELL >= 0.60
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
+    # SELL > 0.50
     trigger, accepted, reason = fsm.evaluate_decision(LayaDecision(action="SELL", confidence=0.75))
     assert trigger == TransitionTrigger.OPEN_LONG_PE
     assert accepted is True
@@ -33,22 +33,28 @@ def test_fsm_flat_to_long_pe():
 
 
 def test_fsm_confidence_threshold_exact_boundary():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
 
-    # 0.60 MUST qualify (confidence >= threshold)
-    trigger, accepted, _ = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.60))
+    # 0.5001 MUST qualify (confidence > threshold)
+    trigger, accepted, _ = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.5001))
     assert accepted is True
     assert trigger == TransitionTrigger.OPEN_LONG_CE
 
-    # 0.599 MUST be rejected
-    trigger_low, accepted_low, reason = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.599))
+    # 0.50 exact boundary MUST be rejected (strict > threshold condition)
+    trigger_exact, accepted_exact, reason_exact = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.50))
+    assert accepted_exact is False
+    assert trigger_exact == TransitionTrigger.NO_ACTION
+    assert "<= threshold" in reason_exact
+
+    # 0.499 MUST be rejected
+    trigger_low, accepted_low, reason_low = fsm.evaluate_decision(LayaDecision(action="BUY", confidence=0.499))
     assert accepted_low is False
     assert trigger_low == TransitionTrigger.NO_ACTION
-    assert "< threshold" in reason
+    assert "<= threshold" in reason_low
 
 
 def test_fsm_long_ce_transitions():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
     fsm.set_state(StrategyState.LONG_CE)
 
     # BUY while LONG_CE -> maintain (no new order)
@@ -68,7 +74,7 @@ def test_fsm_long_ce_transitions():
 
 
 def test_fsm_long_pe_transitions():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
     fsm.set_state(StrategyState.LONG_PE)
 
     # SELL while LONG_PE -> maintain
@@ -88,7 +94,7 @@ def test_fsm_long_pe_transitions():
 
 
 def test_fsm_handles_none_decision():
-    fsm = StrategyStateMachine(confidence_threshold=0.60)
+    fsm = StrategyStateMachine(confidence_threshold=0.50)
     trigger, accepted, reason = fsm.evaluate_decision(None)
     assert trigger == TransitionTrigger.NO_ACTION
     assert accepted is False

@@ -26,19 +26,19 @@ class TradingConfig(BaseModel):
 
 class StrategyConfig(BaseModel):
     decision_interval_seconds: float = Field(default=0.5, gt=0.0)
-    confidence_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
+    confidence_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
 
 
 class MarketDataConfig(BaseModel):
     candle_interval: str = "1minute"
-    historical_candles: int = Field(default=6, ge=1)
+    historical_candles: int = Field(default=60, ge=1)
     max_staleness_seconds: float = Field(default=2.0, gt=0.0)
 
 
 class LayaConfig(BaseModel):
     model: str = "convaiinnovations/laya"
     device: str = "auto"
-    confidence_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
+    confidence_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
     log_full_inference: bool = False
 
 

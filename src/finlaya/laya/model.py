@@ -123,7 +123,16 @@ class LayaDecisionModel:
 
         if isinstance(action_data, dict):
             action_str = action_data.get("choice") or action_data.get("action")
-            confidence = action_data.get("score") or action_data.get("confidence") or action_data.get("probability")
+
+            # Prioritize choice softmax probability from 'probabilities' or 'answer_confidence'
+            probs = action_data.get("probabilities")
+            norm_probs = {str(k).strip().upper(): v for k, v in probs.items()} if isinstance(probs, dict) else {}
+            if action_str and str(action_str).strip().upper() in norm_probs:
+                confidence = norm_probs[str(action_str).strip().upper()]
+            elif action_data.get("answer_confidence") is not None:
+                confidence = action_data.get("answer_confidence")
+            else:
+                confidence = action_data.get("score") or action_data.get("confidence") or action_data.get("probability")
         elif isinstance(action_data, str):
             action_str = action_data
             confidence = raw_res.get("score", 1.0)

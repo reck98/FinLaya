@@ -81,15 +81,15 @@ The system is strictly decoupled into distinct layers:
 5. **Decision Cadence & Transitions**:
    * Decisions are evaluated every 0.5 seconds using a drift-free monotonic clock scheduler.
    * **FLAT**: Laya is asked to choose between `BUY` and `SELL`.
-     * `BUY` ($\ge 0.60$ confidence) $\rightarrow$ Enter `LONG_CE`.
-     * `SELL` ($\ge 0.60$ confidence) $\rightarrow$ Enter `LONG_PE`.
-     * Below threshold $\rightarrow$ Remain `FLAT` and continue polling.
+     * `BUY` ($> 0.50$ confidence) $\rightarrow$ Enter `LONG_CE`.
+     * `SELL` ($> 0.50$ confidence) $\rightarrow$ Enter `LONG_PE`.
+     * Below or equal to threshold $\le 0.50 \rightarrow$ Remain `FLAT` and continue polling.
    * **LONG_CE**: Laya is asked to choose between `BUY`, `SELL`, and `HOLD`.
      * `BUY` or `HOLD` $\rightarrow$ Remain `LONG_CE` (no order submitted).
-     * `SELL` ($\ge 0.60$ confidence) $\rightarrow$ Atomically exit CE, verify `FLAT`, enter PE, verify `LONG_PE`.
+     * `SELL` ($> 0.50$ confidence) $\rightarrow$ Atomically exit CE, verify `FLAT`, enter PE, verify `LONG_PE`.
    * **LONG_PE**: Laya is asked to choose between `BUY`, `SELL`, and `HOLD`.
      * `SELL` or `HOLD` $\rightarrow$ Remain `LONG_PE` (no order submitted).
-     * `BUY` ($\ge 0.60$ confidence) $\rightarrow$ Atomically exit PE, verify `FLAT`, enter CE, verify `LONG_CE`.
+     * `BUY` ($> 0.50$ confidence) $\rightarrow$ Atomically exit PE, verify `FLAT`, enter CE, verify `LONG_CE`.
 6. **Forced Exit**:
    * At `15:13:00 Asia/Kolkata`, decision generation stops immediately. Local pending orders are cancelled, open positions are squared off to `FLAT`, and the session is marked completed.
 
@@ -103,12 +103,14 @@ FinLaya integrates the official open-source **Laya** model:
 
 ### Key Characteristics:
 * **Non-Autoregressive System 1 Inference**: Unlike generative LLMs that predict token by token, Laya computes probability distributions over defined choices in a single forward pass (~10–30ms on GPU, ~30–50ms on CPU).
-* **Strict Typed Output**: The model output is strictly parsed into:
+* **Strict Typed Output & Softmax Choice Probabilities**: The model output is strictly parsed into:
   ```python
   class LayaDecision(BaseModel):
       action: Literal["BUY", "SELL", "HOLD"]
       confidence: float  # 0.0 <= confidence <= 1.0
   ```
+  The decision confidence is mapped from the choice probability distribution (`probabilities[action]` or `answer_confidence`) and must be strictly greater than 0.50 (`> 0.50`) to qualify for execution.
+* **Non-Null Market State Indicators**: 60 historical 1-minute candles are seeded from Upstox at session boot, ensuring that all 15 technical indicators (SMA, EMA, RSI, MACD, ATR, VWAP, Bollinger Bands) and contract bid/ask depth are fully computed with zero nulls right from the first decision tick.
 * **No Natural Language / No Hallucinations**: Prompt templates define discrete choice criteria. No prose is generated or parsed.
 * **Fail Safe / Do Nothing**: If inference encounters a timeout, exception, or malformed score, the decision evaluates to `None` and the system does nothing.
 * **Model Preloading**: The model is loaded once at startup and pre-warmed with a health-check inference before market hours.
@@ -217,17 +219,18 @@ trading:
 
 strategy:
   decision_interval_seconds: 0.5
-  confidence_threshold: 0.60
+  confidence_threshold: 0.50
 
 market_data:
   candle_interval: "1minute"
-  historical_candles: 6
+  historical_candles: 60
   max_staleness_seconds: 2.0
 
 laya:
   model: "convaiinnovations/laya"
   device: "auto"
-  confidence_threshold: 0.60
+  confidence_threshold: 0.50
+  log_full_inference: true
 
 paper_trading:
   enabled: true

@@ -300,6 +300,20 @@ def run(config_path: str = "config/config.yaml", use_mock_laya: bool = False) ->
         # 10. Market Data & Execution Setup
         cache = MarketDataCache()
         candle_engine = CandleEngine(max_candles=config.market_data.historical_candles)
+
+        # Seed CandleEngine with historical candles so technical indicators are immediately available
+        try:
+            hist_candles = inst_service.fetch_historical_candles(
+                NIFTY_UNDERLYING_KEY,
+                interval=config.market_data.candle_interval,
+                min_candles=config.market_data.historical_candles,
+            )
+            candle_engine.seed_historical_candles(hist_candles)
+            console.print(f"[green][OK] Seeded CandleEngine with {len(hist_candles)} historical {config.market_data.candle_interval} candles.[/green]")
+        except Exception as e:
+            logger.warning(f"Could not seed historical candles: {e}", LogEvent.ERROR)
+            console.print(f"[yellow][!] Could not seed historical candles: {e}[/yellow]")
+
         feature_engine = FeatureEngine(
             strike=selected_strike,
             expiry=target_expiry,
